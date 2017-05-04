@@ -57,6 +57,11 @@ class Trainer(object):
         self.optimizer = config.optimizer
         self.batch_size = config.batch_size
 
+        # completion variables
+        self.image_size = 64
+        self.image_shape = [image_size, image_size, 3]
+        self.lam = 0.1
+
         self.step = tf.Variable(0, name='step', trainable=False)
 
         self.g_lr = tf.Variable(config.g_lr, name='g_lr')
@@ -221,6 +226,97 @@ class Trainer(object):
             tf.summary.scalar("misc/g_lr", self.g_lr),
             tf.summary.scalar("misc/balance", self.balance),
         ])
+
+        # completion
+        self.mask = tf.placeholder(tf.float32, [None] + self.image_shape, name='mask')
+        self.contextual_loss = tf.reduce_sum(
+            tf.contrib.layers.flatten(
+                tf.abs(tf.multiply(self.mask, self.G) - tf.multiply(self.mask, self.images))), 1)
+        self.perceptual_loss = self.g_loss
+        self.complete_loss = self.contextual_loss + self.lam*self.perceptual_loss
+        self.grad_complete_loss = tf.gradients(self.complete_loss, self.z)
+
+
+    def complete(self, config):
+        try:
+            os.makedirs(os.path.join(config.outDir, 'hats_imgs'))
+            os.makedirs(os.path.join(config.outDir, 'completed'))
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+
+        tf.global_variables_initializer().run()
+
+        # isLoaded = self.load(self.checkpoint_dir)
+        # assert(isLoaded)
+
+        # data = glob(os.path.join(config.dataset, "*.png"))
+        nImgs = len(config.imgs)
+
+        batch_idxs = int(np.ceil(nImgs/self.batch_size))
+
+        scale = 0.25
+        assert(scale <= 0.5)
+        mask = np.ones(self.image_shape)
+        sz = self.image_size
+        l = int(self.image_size*scale)
+        u = int(self.image_size*(1.0-scale))
+        mask[l:u, l:u, :] = 0.0
+
+        for idx in xrange(0, batch_idxs):
+            l = idx*self.batch_size
+            u = min((idx+1)*self.batch_size, nImgs)
+            batchSz = u-l
+            self.dataset = config.imgs[l:u]
+            batch = self.get_image_from_loader()
+            batch_images = np.array(batch).astype(np.float32)
+            if batchSz < self.batch_size:
+                print(batchSz)
+                padSz = ((0, int(self.batch_size-batchSz)), (0,0), (0,0), (0,0))
+                batch_images = np.pad(batch_images, padSz, 'constant')
+                batch_images = batch_images.astype(np.float32)
+
+            batch_mask = np.resize(mask, [self.batch_size] + self.image_shape)
+            zhats = np.random.uniform(-1, 1, size=(self.batch_size, self.z_num))
+            v = 0
+
+            nRows = np.ceil(batchSz/8)
+            nCols = 8
+            save_images(batch_images[:batchSz,:,:,:], [nRows,nCols],
+                        os.path.join(config.outDir, 'before.png'))
+            masked_images = np.multiply(batch_images, batch_mask)
+            save_images(masked_images[:batchSz,:,:,:], [nRows,nCols],
+                        os.path.join(config.outDir, 'masked.png'))
+
+            for i in xrange(config.nIter):
+                fd = {
+                    self.z: zhats,
+                    self.mask: batch_mask,
+                    self.images: batch_images,
+                }
+                run = [self.complete_loss, self.grad_complete_loss, self.G]
+                loss, g, G_imgs = self.sess.run(run, feed_dict=fd)
+
+                v_prev = np.copy(v)
+                v = config.momentum*v - config.lr*g[0]
+                zhats += -config.momentum * v_prev + (1+config.momentum)*v
+                zhats = np.clip(zhats, -1, 1)
+
+                if i % 50 == 0:
+                    print(i, np.mean(loss[0:batchSz]))
+                    imgName = os.path.join(config.outDir,
+                                           'hats_imgs/{:04d}.png'.format(i))
+                    nRows = np.ceil(batchSz/8)
+                    nCols = 8
+                    save_images(G_imgs[:batchSz,:,:,:], [nRows,nCols], imgName)
+
+                    inv_masked_hat_images = np.multiply(G_imgs, 1.0-batch_mask)
+                    completeed = masked_images + inv_masked_hat_images
+                    imgName = os.path.join(config.outDir,
+                                           'completed/{:04d}.png'.format(i))
+                    save_images(completeed[:batchSz,:,:,:], [nRows,nCols], imgName)
+
+
 
     def build_test_model(self):
         with tf.variable_scope("test") as vs:
