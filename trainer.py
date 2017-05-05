@@ -58,7 +58,8 @@ class Trainer(object):
         self.batch_size = config.batch_size
 
         # completion variables
-        self.image_size = 64
+        image_size = 64
+        self.image_size = image_size
         self.image_shape = [image_size, image_size, 3]
         self.lam = 0.1
 
@@ -169,6 +170,9 @@ class Trainer(object):
                 #prev_measure = cur_measure
 
     def build_model(self):
+        self.images = tf.placeholder(
+            tf.float32, [None] + self.image_shape, name='real_images')
+
         self.x = self.data_loader
         x = norm_img(self.x)
 

@@ -42,13 +42,6 @@ train_arg.add_argument('--beta2', type=float, default=0.999)
 train_arg.add_argument('--gamma', type=float, default=0.5)
 train_arg.add_argument('--lambda_k', type=float, default=0.001)
 train_arg.add_argument('--use_gpu', type=str2bool, default=True)
-train_arg.add_argument('--lr', type=float, default=0.01)
-train_arg.add_argument('--momentum', type=float, default=0.9)
-train_arg.add_argument('--nIter', type=int, default=1000)
-train_arg.add_argument('--imgSize', type=int, default=64)
-train_arg.add_argument('--lam', type=float, default=0.1)
-train_arg.add_argument('--outDir', type=str, default='completions')
-train_arg.add_argument('imgs', type=str, nargs='+')
 
 # Misc
 misc_arg = add_argument_group('Misc')

@@ -21,8 +21,6 @@ parser.add_argument('imgs', type=str, nargs='+')
 
 args = parser.parse_args()
 
-assert(os.path.exists(args.checkpointDir))
-
 config, unparsed = get_config()
 config.gpu_options.allow_growth = True
 
@@ -30,4 +28,4 @@ data_loader = get_loader(
             data_path, config.batch_size, config.input_scale_size,
             config.data_format, config.split)
 trainer = Trainer(config, data_loader)
-trainer.complete(config)
+trainer.complete(config, args)
