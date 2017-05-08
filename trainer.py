@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-import os
+import os, errno
 import StringIO
 import scipy.misc
 import numpy as np
@@ -249,7 +249,7 @@ class Trainer(object):
             if e.errno != errno.EEXIST:
                 raise
 
-        tf.global_variables_initializer().run()
+        # tf.global_variables_initializer().run()
 
         # isLoaded = self.load(self.checkpoint_dir)
         # assert(isLoaded)
@@ -286,10 +286,11 @@ class Trainer(object):
 
             nRows = np.ceil(batchSz/8)
             nCols = 8
-            save_images(batch_images[:batchSz,:,:,:], [nRows,nCols],
+            save_image(batch_images[:batchSz,:,:,:],
                         os.path.join(config.outDir, 'before.png'))
+
             masked_images = np.multiply(batch_images, batch_mask)
-            save_images(masked_images[:batchSz,:,:,:], [nRows,nCols],
+            save_image(masked_images[:batchSz,:,:,:],
                         os.path.join(config.outDir, 'masked.png'))
 
             for i in xrange(config.nIter):
@@ -312,13 +313,13 @@ class Trainer(object):
                                            'hats_imgs/{:04d}.png'.format(i))
                     nRows = np.ceil(batchSz/8)
                     nCols = 8
-                    save_images(G_imgs[:batchSz,:,:,:], [nRows,nCols], imgName)
+                    save_image(G_imgs[:batchSz,:,:,:], imgName)
 
                     inv_masked_hat_images = np.multiply(G_imgs, 1.0-batch_mask)
                     completeed = masked_images + inv_masked_hat_images
                     imgName = os.path.join(config.outDir,
                                            'completed/{:04d}.png'.format(i))
-                    save_images(completeed[:batchSz,:,:,:], [nRows,nCols], imgName)
+                    save_image(completeed[:batchSz,:,:,:], imgName)
 
 
 
